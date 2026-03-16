@@ -1,18 +1,31 @@
 ---
 name: pinpoint
-description: "Expand broad, vague, or mixed questions into stronger research starting points before deeper analysis. Pinpoint first runs trend capture, anti-consensus exploration, and multi-perspective generation, then converges into one consolidated research brief. Default behavior: if the brief still needs framing, return the structured brief and stop; if it is already researchable and suitable for deep-research, emit the structured handoff payload for an outer agent to invoke deep-research."
+description: "Pinpoint is an extensible research entry router. It analyzes a request through trend scan, anti-consensus scan, perspective expansion, and one consolidated brief, then routes the request to deep-research, light-answer, needs-confirmation, or another skill. It preserves the original clarification behavior as the needs-confirmation route."
 ---
 
 # Pinpoint
 
-Use this skill as a general research entrypoint.
+Use this skill as a research entry router.
 
-Your job is not to answer the original question. Your job is to expand useful perspectives, converge on one research brief, and then decide whether the request is ready for research handoff.
+Your job is not to answer the original question. Your job is to:
 
-This skill has exactly two terminal states:
+1. analyze the request through a compact framing pipeline
+2. converge on one research-oriented brief
+3. decide the most appropriate downstream route
 
-- `needs_framing`: the request still needs narrowing, clarification, or a lighter non-deep-research next step
-- `handoff_ready`: the question is already researchable and also appropriate for `deep-research`
+## Core Positioning
+
+Pinpoint has two layers:
+
+- `analysis layer`: improve the shape of the problem before downstream execution
+- `routing layer`: decide what should happen next
+
+Pinpoint is not:
+
+- a deep research executor
+- a content generator
+- an AI critic
+- an auto-run orchestration engine
 
 ## Trigger Rules
 
@@ -20,23 +33,14 @@ Invoke this skill when the user gives:
 
 - a broad topic that needs narrowing
 - a vague research question
-- a mixed question that contains multiple subproblems
-- a claim, thesis, or hypothesis that needs to be framed for research
-- an explicit request to define, frame, narrow, or decompose a research question before analysis
+- a mixed question with multiple possible framings
+- a claim, thesis, or hypothesis that needs to be framed before research
+- a request that needs to be routed between deep research, lightweight answering, confirmation, or another skill
 
 Do not invoke this skill when the user gives:
 
-- a simple factual lookup
-- a clearly scoped data retrieval request
-- a writing request such as an article, report, or newsletter draft
-- a question that is already narrow enough for direct research
-
-If the request is already researchable and appropriate for `deep-research`:
-
-- say so briefly
-- do not force candidate rewrites
-- emit the structured `handoff_ready` payload
-- do not do evidence gathering yourself
+- a simple factual lookup that clearly does not need routing
+- a direct writing request with no research-routing need
 
 ## Pipeline
 
@@ -45,284 +49,378 @@ Run the request through this sequence:
 1. `Trend Scan`
 2. `Anti-Consensus Scan`
 3. `Perspective Expansion`
-4. `Consolidated Research Brief`
-5. `Researchability Check`
+4. `Consolidated Brief`
+5. `Routing Decision`
 
-The first three stages are inputs to the brief. They are not independent terminal outputs.
+Hard rule:
+
+- the first three stages may widen perspective, but you must always converge into one `Consolidated Brief`
+- never select a route directly from raw signals or lens lists
+
+## Analysis Layer
+
+Produce one stable object conceptually called `analysis_block`.
+
+Required sections:
+
+- `original_question`
+- `trend_signals`
+- `anti_consensus_angles`
+- `perspective_lenses`
+- `consolidated_brief`
 
 ### Trend Scan
 
 Purpose:
 
-- identify meaningful directional changes, emerging signals, timing windows, or shifting constraints
+- identify directional changes, emerging signals, timing windows, or shifting constraints
 
-Policy:
+Rules:
 
-- treat outputs as framing hypotheses, not asserted findings
-- keep them concise and decision-relevant
-- if no meaningful trend signals are identifiable, emit `none identified`
-
-Output constraints:
-
-- 3 to 5 trend signals maximum
+- outputs are framing hypotheses, not asserted findings
+- maximum 5 items
+- if weak or unsupported, use `none identified`
 
 ### Anti-Consensus Scan
 
 Purpose:
 
-- surface mainstream assumptions and identify angles that may be underexplored, weakly challenged, or misread
+- surface assumptions that may be weakly challenged, underexplored, or worth testing against mainstream views
 
-Policy:
+Rules:
 
-- treat outputs as framing hypotheses or tensions, not final claims
-- if no credible anti-consensus angle is available, emit `none identified`
-
-Output constraints:
-
-- 2 to 4 anti-consensus angles maximum
+- outputs are hypotheses or tensions, not conclusions
+- maximum 4 items
+- if weak or unsupported, use `none identified`
 
 ### Perspective Expansion
 
 Purpose:
 
-- generate multiple useful lenses before convergence
+- generate multiple framing lenses before convergence
 
-Lens examples:
+Rules:
 
-- market
-- technology
-- user
-- policy
-- competition
-- distribution
-- organizational capability
+- use exactly 3 lens slots: `Lens 1`, `Lens 2`, `Lens 3`
+- each populated lens must materially change the framing
+- unused slots become `not applicable`
+- avoid paraphrase-only variation
 
-Policy:
-
-- use exactly 3 labeled lens slots: `Lens 1`, `Lens 2`, `Lens 3`
-- each populated lens must materially change how the research would be framed
-- if the topic cannot support all 3 meaningful lenses, fill unused slots with `not applicable`
-- avoid redundant rewordings
-
-### Consolidated Research Brief
+### Consolidated Brief
 
 This is the mandatory convergence point.
 
-Hard rules:
+Required fields:
 
-- always converge into one `Consolidated Research Brief`
-- never stop at a raw list of insights, trend signals, or perspective lenses
-- never hand off while multiple competing research questions remain unresolved
+- `research_question`
+- `research_goal`
+- `boundaries`
+- `out_of_scope`
+- `key_terms`
+- `framing_rationale`
 
-The brief must contain:
+`boundaries` must use this typed shape:
 
-- chosen research question
-- research goal
-- key boundaries
-- explicit out-of-scope area
-- core terms
-- why this framing is preferable to the discarded alternatives
+```json
+{
+  "subject": "string",
+  "time_range": "string",
+  "geography_or_context": "string",
+  "evaluation_criteria": ["string"],
+  "out_of_scope": ["string"]
+}
+```
 
-## Readiness Criteria
+Rules:
 
-Mark the question as `handoff_ready` only when all of the following are true:
+- exactly one recommended framing
+- alternatives may be included only as discarded alternatives
+- if multiple framings remain equally live, routing must not advance beyond confirmation
+- `out_of_scope` must match `boundaries.out_of_scope`
 
-- the consolidated brief expresses one clear research subject
-- the consolidated brief expresses one clear research question
-- the time range is explicit or safely inferable
-- the geography or context is explicit or safely inferable
-- the task type is clear, such as compare, evaluate, trend, feasibility, landscape, chronology, or review
-- the task is substantial enough for `deep-research`, meaning it needs multi-source synthesis, comparison, verification, or report-style analysis rather than a simple lookup
-- either:
-  - at least one evaluation criterion is explicit or safely inferable for evaluative tasks, or
-  - the descriptive task has a clear organizing lens, such as trend, landscape, chronology, or mechanism
-- the request is not mixing multiple unrelated research problems
+## Routing Layer
 
-Otherwise mark it as `needs_framing`.
+Produce:
 
-Operational defaults:
+- `routing_decision`
+- `route_payload`
 
-- comparisons or evaluations without a time range default to an absolute `through YYYY-MM-DD` range anchored to the request date
-- trend or landscape requests without a time range default to an absolute trailing 24-month range anchored to the request date
-- geography or context may be inferred only when the broader default is low-risk; otherwise keep the question in `needs_framing`
-- related multi-part requests stay together only when they support one deliverable and one shared research question
+### Routing Decision
 
-Mode selection defaults:
+Required fields:
 
-- explicit user request for `ultradeep` wins over all other mode rules
-- otherwise use `deep` for high-stakes, decision-shaping, or explicitly rigorous requests
-- otherwise use `quick` for exploratory but still researchable requests
+- `target`
+- `reason`
+- `confidence`
+- `needs_user_confirmation`
+
+Invariant:
+
+- `needs_user_confirmation = true` if and only if `target = needs-confirmation`
+- for all other targets, `needs_user_confirmation = false`
+
+### Allowed Targets
+
+- `needs-confirmation`
+- `deep-research`
+- `light-answer`
+- `skill-route`
+
+### Target Meanings
+
+#### `needs-confirmation`
+
+Use when:
+
+- the brief still has unresolved ambiguity
+- key boundaries are missing
+- multiple competing framings remain
+- the best next step requires user confirmation before execution
+
+This is the preserved form of the original Pinpoint clarification behavior.
+
+#### `deep-research`
+
+Use when:
+
+- the brief is converged
+- the task is substantial enough for multi-source synthesis, verification, or report-style analysis
+- the downstream payload can be filled safely
+
+#### `light-answer`
+
+Use when:
+
+- the question is already clear enough to answer
+- the task does not justify `deep-research`
+- no better downstream skill is a clearer match
+
+Semantics:
+
+- Pinpoint does not answer the question itself
+- `light-answer` is a dispatch contract for an outer agent or lighter downstream workflow
+- if no outer dispatch exists in the current environment, the outer agent may answer directly using the emitted payload
+
+#### `skill-route`
+
+Use when:
+
+- the question is already clear
+- a specific skill is a better next step than `deep-research` or `light-answer`
+
+## Routing Order
+
+Use this order exactly:
+
+1. if key ambiguity remains, route to `needs-confirmation`
+2. otherwise, if the task is substantial enough for `deep-research`, route to `deep-research`
+3. otherwise, if a specific skill is the best match, route to `skill-route`
+4. otherwise, route to `light-answer`
+
+## Deterministic Defaults
+
+### Time Normalization
+
+- comparisons and evaluations without explicit time range normalize to an absolute `through YYYY-MM-DD` value anchored to the request date
+- trend or landscape requests without explicit time range normalize to an absolute trailing 24-month range anchored to the request date
+
+### Mode Selection for `deep-research`
+
+- explicit user request for `ultradeep` wins
+- otherwise use `deep` for high-stakes or explicitly rigorous requests
+- otherwise use `quick` for exploratory but still substantial research requests
 - otherwise use `standard`
-- `ultradeep` is only for maximum-comprehensiveness requests explicitly signaled by the user
 
-## Workflow
+### Context Inference
 
-Run these steps in order:
+- geography or context may be inferred only when low-risk
+- otherwise route to `needs-confirmation`
 
-1. Preserve the user's original question.
-2. Run `Trend Scan`.
-3. Run `Anti-Consensus Scan`.
-4. Run `Perspective Expansion`.
-5. Infer the likely research goal behind the question when the intent is clear.
-6. If intent is ambiguous, present alternatives as assumptions rather than silently choosing one.
-7. Build one `Consolidated Research Brief` with:
-   - object or subject
-   - time range
-   - geography or context
-   - evaluation criteria
-   - what is out of scope
-8. If the brief is still ambiguous or too broad, rewrite it into 2 to 3 candidate research directions.
-9. Diagnose whether the brief is `needs_framing` or `handoff_ready`.
-10. If the terminal state is `needs_framing`, produce the structured brief and stop.
-11. If the terminal state is `handoff_ready`, emit the structured handoff payload for `deep-research`.
-12. Stop.
+### Related Multi-Part Requests
 
-## Assumption Policy
+- keep them together only if they support one deliverable and one shared research question
+- otherwise route to `needs-confirmation`
 
-- If intent is clear, infer the likely research goal and label it as inferred.
-- If intent is ambiguous, present alternatives explicitly as assumptions.
-- Ask a clarification question only when the ambiguity would materially change the research direction.
-- Do not recommend a rewrite unless the original question is genuinely too broad, too vague, or mixed across multiple problems.
+## Route Payload Contract
 
-## Output Shape
+Conceptually, Pinpoint emits a uniform route shell:
 
-Use one of these output shapes.
+```json
+{
+  "route_version": "2.0",
+  "target": "deep-research | light-answer | needs-confirmation | skill-route",
+  "payload": {}
+}
+```
 
-### Output Shape: `needs_framing`
+Outer-agent rule:
 
-Use a semi-structured format with this compact required backbone:
+- read `target`
+- then parse only the payload relevant to that target
+
+External compatibility rule:
+
+- this route shell is Pinpoint's canonical internal contract
+- when `target = deep-research`, the user-facing output must remain the current legacy top-level `handoff_ready` JSON shape
+- no dual-format ambiguity is allowed at runtime
+
+### Payload: `deep-research`
+
+Preserve the current handoff contract inside `payload` as much as possible.
+
+Required fields:
+
+- `handoff_version`
+- `terminal_state`
+- `target_skill`
+- `routing_reason`
+- `research_question`
+- `recommended_mode`
+- `research_goal`
+- `boundaries`
+- `assumptions`
+- `key_terms`
+- `success_criteria`
+- `next_action`
+
+Compatibility rules:
+
+- preserve current field names
+- preserve these canonical constants exactly:
+  - `handoff_version: "1.1"`
+  - `terminal_state: "handoff_ready"`
+  - `target_skill: "deep-research"`
+  - `next_action: "Invoke deep-research with this payload"`
+- derive the payload from `consolidated_brief`, not raw upstream signals
+- emit the legacy top-level handoff JSON directly as the user-facing output for this route
+
+### Payload: `light-answer`
+
+Required fields:
+
+- `question`
+- `answer_goal`
+- `constraints`
+- `suggested_depth`
+- `key_terms`
+
+### Payload: `needs-confirmation`
+
+Required fields:
+
+- `recommended_framing`
+- `alternative_framings`
+- `missing_boundaries`
+- `next_user_action`
+
+This payload preserves the original Pinpoint clarification role in structured form.
+
+### Payload: `skill-route`
+
+Required fields:
+
+- `skill_id`
+- `routing_reason`
+- `skill_input`
+
+Registry rules:
+
+- `skill_id` must match the canonical installed skill name
+- `skill_input` must use this envelope:
+
+```json
+{
+  "prompt": "string",
+  "context": {},
+  "constraints": []
+}
+```
+
+- the outer agent must verify skill availability before dispatch
+- if the target skill is unavailable, fall back to `light-answer` when the request is still answerable without the skill; otherwise fall back to `needs-confirmation`
+
+## Output Policy
+
+Pinpoint conceptually produces:
+
+- `analysis_block`
+- `routing_decision`
+- `route_payload`
+
+Exact serialization boundaries:
+
+- `deep-research`: optional one-line lead-in, then legacy top-level JSON payload only
+- `needs-confirmation`: readable clarification brief first, then exactly one fenced `json` block containing the canonical route shell
+- `light-answer`: short routing summary first, then exactly one fenced `json` block containing the canonical route shell
+- `skill-route`: short routing summary first, then exactly one fenced `json` block containing the canonical route shell
+
+### Output Shape: `needs-confirmation`
+
+The readable clarification brief must include:
 
 - `Original Question`
 - `Trend Signals`
 - `Anti-Consensus Angles`
 - `Perspective Lenses`
-- `Consolidated Research Brief`
-- `Researchability Check`
-- `Terminal State`
-- `Why It Needs Narrowing`
+- `Consolidated Brief`
+- `Routing Decision`
 - `Recommended Framing`
+- `Alternative Framings`
 - `Next User Action`
-- `Stop / Continue`
 
-Add these sections when they materially help:
+### Output Shape: `deep-research`
 
-- `Problem Diagnosis`
-- `Research Goal`
-- `Key Terms And Boundaries`
-- `Candidate Research Versions`
-- `Research Brief`
+Do not emit readable analysis sections if that would break the legacy parser contract.
 
-If the request is clear but too lightweight for `deep-research`, explain that directly inside `Researchability Check` and use `Next User Action` to recommend a lighter next step instead of asking for more narrowing.
+Emit:
 
-### Output Shape: `handoff_ready`
+- optional one-line lead-in
+- then the legacy top-level deep-research JSON only
 
-Use `Trend Scan`, `Anti-Consensus Scan`, `Perspective Expansion`, and `Consolidated Research Brief` as internal reasoning inputs, but do not emit them if doing so would break the outer-agent parsing contract.
+### Output Shape: `light-answer`
 
-Emit a machine-readable JSON block and nothing else except an optional one-line lead-in.
+Emit:
 
-Required schema:
+- short routing summary
+- then one fenced `json` block containing the canonical route shell
 
-```json
-{
-  "handoff_version": "1.1",
-  "terminal_state": "handoff_ready",
-  "target_skill": "deep-research",
-  "routing_reason": "Question is already researchable and requires deep-research style synthesis",
-  "research_question": "string",
-  "recommended_mode": "quick | standard | deep | ultradeep",
-  "research_goal": "string",
-  "boundaries": {
-    "subject": "string",
-    "time_range": "string",
-    "geography_or_context": "string",
-    "evaluation_criteria": ["string"],
-    "out_of_scope": ["string"]
-  },
-  "assumptions": ["string"],
-  "key_terms": ["string"],
-  "success_criteria": ["string"],
-  "next_action": "Invoke deep-research with this payload"
-}
-```
+### Output Shape: `skill-route`
 
-When producing `handoff_ready`:
+Emit:
 
-- include all top-level keys
-- prefer explicit values over vague placeholders
-- infer defaults only when the inference is low-risk
-- keep the payload stable so an outer agent can parse it reliably
-- normalize inferred time ranges into absolute strings such as `through 2026-03-16` or `2024-03-16 to 2026-03-16`
-- use only these mode values: `quick`, `standard`, `deep`, `ultradeep`
-- use arrays for list fields even when empty
-- use `[]` for `evaluation_criteria` only on descriptive tasks such as trend, landscape, or chronology
-- do not use `null`; if a required value cannot be filled safely, do not emit `handoff_ready`
-- do not include source lists, evidence plans, or final conclusions
-- derive the payload from the `Consolidated Research Brief`, not directly from raw trend or lens outputs
-
-## Research Brief
-
-When you include a research brief, keep it short and practical. Summarize:
-
-- the chosen research question
-- the research goal
-- the boundaries
-- the key terms that matter for this round
-- what is explicitly out of scope
-- why this framing beats the discarded alternatives
-- a one-line next research action after user confirmation
+- short routing summary
+- then one fenced `json` block containing the canonical route shell
 
 ## Quality Bar
 
-The goal is not to sound smart. The goal is to make the question researchable.
+The goal is not to sound smart. The goal is to improve the next decision.
 
 Prefer:
 
-- narrower scope
 - converged framing after useful perspective expansion
 - explicit boundaries
-- testable wording
-- direct research utility
+- parse-stable routing
+- direct downstream utility
 
 Avoid:
 
-- answering the full question too early
-- staying in a divergent insight list without converging
-- keeping the wording broad but impressive
-- over-defining irrelevant terms
-- silently replacing the user's intent
-- forcing one framing when multiple research directions are plausible
+- answering too early
+- routing from raw insight lists
+- fuzzy target selection
+- output shapes that vary unpredictably
 
 ## Stop Rule
 
-After the workflow, stop in one of two ways:
+After routing, stop in one of these ways:
 
-- if `needs_framing`, stop with a structured brief and the exact next user action
-- if `handoff_ready`, stop after emitting the structured payload so an outer agent can invoke `deep-research`
+- `needs-confirmation`: stop after the readable brief and canonical route shell
+- `deep-research`: stop after the legacy top-level JSON payload
+- `light-answer`: stop after the routing summary and canonical route shell
+- `skill-route`: stop after the routing summary and canonical route shell
 
-Do not automatically proceed into:
+Do not:
 
-- evidence gathering
-- framework building
-- counterarguments
-- scenario analysis
-- recursive follow-up research
-- direct execution of `deep-research` from inside this skill
-
-Stop boundary:
-
-- allow at most a one-line next step outside the JSON payload
-- do not include source lists
-- do not include framework trees
-- do not include evidence-gathering plans
-- do not expand into subquestion research before confirmation
-
-## References
-
-Load these only if the user explicitly asks to continue beyond phase 1:
-
-- `references/phase-2-framework.md` for framework building
-- `references/phase-3-evidence.md` for evidence gathering
-- `references/phase-4-counterarguments.md` for counterarguments and failure cases
-- `references/phase-5-scenarios.md` for scenario analysis
-- `references/phase-6-synthesis.md` for final synthesis and conclusion shaping
-- `references/output-examples.md` for example outputs
+- execute downstream skills from inside Pinpoint
+- gather evidence for deep research
+- generate full content drafts
+- continue past the selected route

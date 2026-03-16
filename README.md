@@ -1,9 +1,15 @@
 # Pinpoint
 
-`Pinpoint / 定点` is a research-framing skill. It acts as a research entry router:
+`Pinpoint / 定点` is an extensible research entry router.
 
-- if the question is broad, vague, or mixed, it first expands useful perspectives and then converges into a clearer research brief
-- if the question is already researchable and substantial enough for `deep-research`, it emits a structured handoff payload for an outer agent to invoke `deep-research`
+It does not only clarify vague questions. It first analyzes the request through a compact framing pipeline, then decides the best next route:
+
+- `needs-confirmation`
+- `deep-research`
+- `light-answer`
+- `skill-route`
+
+The original clarification behavior is preserved as the `needs-confirmation` route.
 
 ## Compatibility
 
@@ -37,12 +43,6 @@ Or copy it:
 cp -R /absolute/path/to/pinpoint ~/.claude/skills/pinpoint
 ```
 
-Then invoke it in Claude Code with natural language, for example:
-
-```text
-Use pinpoint to turn this topic into a researchable question: AI agents in healthcare
-```
-
 ### Gemini CLI
 
 Place the `pinpoint` directory under your Gemini CLI skills directory or configured skills root, then activate it by name:
@@ -50,18 +50,6 @@ Place the `pinpoint` directory under your Gemini CLI skills directory or configu
 ```text
 activate_skill pinpoint
 ```
-
-Example prompt after activation:
-
-```text
-Turn this topic into 2-3 researchable directions and a short brief: AI agents in healthcare
-```
-
-Notes:
-
-- `Pinpoint` does not depend on subagents.
-- Gemini CLI's lack of Claude-style `Task` support does not block this skill.
-- Tool names referenced by shared skill infrastructure may need Gemini CLI equivalents such as `activate_skill`.
 
 ## Structure
 
@@ -80,70 +68,114 @@ pinpoint/
     └── phase-6-synthesis.md
 ```
 
-## Usage Contract
+## Core Flow
 
-Core flow only:
+Pinpoint runs this sequence:
 
-- preserve the original question
-- run trend capture
-- run anti-consensus exploration
-- run multi-perspective generation
-- converge into one consolidated research brief
-- diagnose whether it needs framing or is ready for handoff
-- only mark handoff-ready when the task also fits `deep-research` rather than a simple lookup
-- narrow scope and boundaries where needed
-- propose 2-3 candidate research directions only when convergence is still weak
-- produce a compact research brief when framing is still needed
-- emit a structured `deep-research` handoff payload when the question is already researchable
-- stop
+1. `Trend Scan`
+2. `Anti-Consensus Scan`
+3. `Perspective Expansion`
+4. `Consolidated Brief`
+5. `Routing Decision`
 
-This skill is intentionally front-loaded. Its job is to improve question quality before deeper analysis starts. It does not gather evidence or execute `deep-research` itself.
+The first three stages are framing inputs. They must always converge into one `Consolidated Brief` before routing.
 
-## Perspective Expansion
+## Route Targets
 
-Before narrowing, `Pinpoint` now runs three framing stages:
+### `needs-confirmation`
 
-- `Trend Scan`: capture high-value directional signals
-- `Anti-Consensus Scan`: surface underexplored or weakly challenged angles
-- `Perspective Expansion`: generate 3 useful framing lenses before convergence
+Use when the request still needs user confirmation before downstream execution.
 
-These stages are inputs to one `Consolidated Research Brief`. `Pinpoint` must not stop at a raw insight list or hand off directly from divergent lens output.
+This is the preserved form of the original Pinpoint clarification workflow.
 
-## Handoff Contract
+### `deep-research`
 
-When `Pinpoint` determines the question is already researchable and suitable for `deep-research`, it should end in `handoff_ready` and emit a stable JSON payload for an outer agent. The outer agent is responsible for invoking `deep-research`.
+Use when the request is converged and substantial enough for multi-source synthesis, verification, or report-style analysis.
 
-Core payload fields:
+### `light-answer`
 
-- `handoff_version`
-- `terminal_state`
-- `target_skill`
-- `research_question`
-- `recommended_mode`
-- `research_goal`
-- `boundaries`
-- `assumptions`
-- `key_terms`
-- `success_criteria`
-- `next_action`
+Use when the request is clear but not substantial enough for `deep-research`.
 
-This keeps `Pinpoint` focused on framing and routing, while `deep-research` remains responsible for retrieval, verification, synthesis, and report generation.
+Pinpoint does not answer directly. It emits a lightweight-answer payload for an outer agent or lighter downstream workflow.
 
-Outer-agent expectations:
+### `skill-route`
 
-- validate the payload before dispatch
-- treat inferred time ranges as normalized absolute values in the payload
-- honor deterministic mode selection: `standard` by default, `quick` for exploratory asks, `deep` for high-stakes asks, `ultradeep` only when explicitly requested
-- if validation fails or `deep-research` is unavailable, do not auto-dispatch
-- if `deep-research` rejects the task as too lightweight, fall back to a lighter workflow instead of looping back into `Pinpoint`
-- if `deep-research` fails operationally, surface the payload plus the error and stop
+Use when the request is clear and a specific skill is a better next step than `deep-research` or `light-answer`.
 
-When `Pinpoint` ends in `needs_framing`, the output should be a human-readable brief with:
+## Analysis Contract
 
-- `Trend Signals`
-- `Anti-Consensus Angles`
-- `Perspective Lenses`
-- `Consolidated Research Brief`
-- `Researchability Check`
-- `Recommended Framing`
-- `Next User Action`
+Pinpoint conceptually produces an `analysis_block` with:
+
+- `original_question`
+- `trend_signals`
+- `anti_consensus_angles`
+- `perspective_lenses`
+- `consolidated_brief`
+
+`consolidated_brief` is the authoritative basis for all routing. Pinpoint must not route directly from raw insight lists.
+
+## Routing Contract
+
+Pinpoint conceptually produces:
+
+- `routing_decision`
+- `route_payload`
+
+The canonical internal route shell is:
+
+```json
+{
+  "route_version": "2.0",
+  "target": "deep-research | light-answer | needs-confirmation | skill-route",
+  "payload": {}
+}
+```
+
+Outer agents should:
+
+- read `target`
+- parse only the payload for that target
+- avoid assuming one target's payload shape applies to another
+- treat `needs_user_confirmation` as true only for the `needs-confirmation` route
+
+## Deep Research Compatibility
+
+When `target = deep-research`, Pinpoint must preserve the current legacy top-level handoff JSON shape as the user-facing output.
+
+Canonical constants that remain fixed:
+
+- `handoff_version: "1.1"`
+- `terminal_state: "handoff_ready"`
+- `target_skill: "deep-research"`
+- `next_action: "Invoke deep-research with this payload"`
+
+This route remains compatibility-first.
+
+## Output Boundaries
+
+### `deep-research`
+
+- optional one-line lead-in
+- then legacy top-level JSON only
+
+### `needs-confirmation`
+
+- readable clarification brief
+- then exactly one fenced `json` block containing the canonical route shell
+
+### `light-answer`
+
+- short routing summary
+- then exactly one fenced `json` block containing the canonical route shell
+
+### `skill-route`
+
+- short routing summary
+- then exactly one fenced `json` block containing the canonical route shell
+
+## Notes
+
+- Pinpoint does not execute downstream skills itself.
+- Pinpoint does not gather deep-research evidence itself.
+- Pinpoint does not generate full content drafts.
+- Pinpoint's job is to improve the next decision, not to finish the whole workflow.

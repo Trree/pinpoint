@@ -1,4 +1,4 @@
 interface:
   display_name: "Pinpoint"
-  short_description: "Expand and clarify topics before research"
-  default_prompt: "Use $pinpoint to expand this topic with trend signals, anti-consensus angles, and perspective lenses, then converge into one consolidated research brief. If the brief still needs framing, return the structured brief with a recommended framing and next user action. If it is handoff-ready, emit the structured deep-research handoff payload."
+  short_description: "Analyze and route research requests"
+  default_prompt: "Use $pinpoint to analyze this request with trend scan, anti-consensus scan, perspective expansion, and one consolidated brief, then route it to needs-confirmation, deep-research, light-answer, or skill-route. Preserve legacy top-level JSON output when routing to deep-research."
