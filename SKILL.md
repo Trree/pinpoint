@@ -1,145 +1,52 @@
 ---
 name: pinpoint
-description: "Pinpoint is an extensible research entry router. It analyzes a request through trend scan, anti-consensus scan, perspective expansion, and one consolidated brief, then routes the request to deep-research, light-answer, needs-confirmation, or another skill. It preserves the original clarification behavior as the needs-confirmation route."
+description: "Research entry router. Frames the request through a 3-stage divergence pipeline, pauses for user confirmation, converges to one brief, then routes to deep-research, light-answer, needs-confirmation, or skill-route."
 ---
 
 # Pinpoint
 
-Use this skill as a research entry router.
+Research entry router. Analyze the request, converge on one brief, decide the downstream route. Do not answer the question.
 
-Your job is not to answer the original question. Your job is to:
+## Trigger
 
-1. analyze the request through a compact framing pipeline
-2. converge on one research-oriented brief
-3. decide the most appropriate downstream route
+Invoke when: broad or vague topic, mixed framings, claim needing framing before research, or any request needing routing between deep research / lightweight answer / confirmation / another skill.
 
-## Core Positioning
-
-Pinpoint has two layers:
-
-- `analysis layer`: improve the shape of the problem before downstream execution
-- `routing layer`: decide what should happen next
-
-Pinpoint is not:
-
-- a deep research executor
-- a content generator
-- an AI critic
-- an auto-run orchestration engine
-
-## Trigger Rules
-
-Invoke this skill when the user gives:
-
-- a broad topic that needs narrowing
-- a vague research question
-- a mixed question with multiple possible framings
-- a claim, thesis, or hypothesis that needs to be framed before research
-- a request that needs to be routed between deep research, lightweight answering, confirmation, or another skill
-
-Do not invoke this skill when the user gives:
-
-- a simple factual lookup that clearly does not need routing
-- a direct writing request with no research-routing need
+Do not invoke when: simple factual lookup, direct writing request with no routing need.
 
 ## Pipeline
-
-Run the request through this sequence:
 
 1. `Trend Scan`
 2. `Anti-Consensus Scan`
 3. `Perspective Expansion`
-4. `User Confirmation` ← mandatory pause
+4. `User Confirmation` ← mandatory stop
 5. `Consolidated Brief`
 6. `Routing Decision`
 
-Hard rule:
-
-- the first three stages may widen perspective, but you must always converge into one `Consolidated Brief`
-- never select a route directly from raw signals or lens lists
-- never advance to `Consolidated Brief` without explicit user confirmation after stage 3
-
 ## Analysis Layer
 
-Produce one stable object conceptually called `analysis_block`.
-
-Required sections:
-
-- `original_question`
-- `trend_signals`
-- `anti_consensus_angles`
-- `perspective_lenses`
-- `user_confirmation`
-- `consolidated_brief`
+`analysis_block` fields: `original_question`, `trend_signals`, `anti_consensus_angles`, `perspective_lenses`, `user_confirmation`, `consolidated_brief`
 
 ### Trend Scan
 
-Purpose:
-
-- identify directional changes, emerging signals, timing windows, or shifting constraints
-
-Rules:
-
-- outputs are framing hypotheses, not asserted findings
-- maximum 5 items
-- if weak or unsupported, use `none identified`
+Identify directional changes, emerging signals, timing windows, or shifting constraints. Outputs are framing hypotheses, not findings. Max 5 items. Use `none identified` if weak.
 
 ### Anti-Consensus Scan
 
-Purpose:
-
-- surface assumptions that may be weakly challenged, underexplored, or worth testing against mainstream views
-
-Rules:
-
-- outputs are hypotheses or tensions, not conclusions
-- maximum 4 items
-- if weak or unsupported, use `none identified`
+Surface assumptions that may be weakly challenged or underexplored. Outputs are hypotheses or tensions, not conclusions. Max 4 items. Use `none identified` if weak.
 
 ### Perspective Expansion
 
-Purpose:
-
-- generate multiple framing lenses before convergence
-
-Rules:
-
-- use exactly 3 lens slots: `Lens 1`, `Lens 2`, `Lens 3`
-- each populated lens must materially change the framing
-- unused slots become `not applicable`
-- avoid paraphrase-only variation
+Generate 3 framing lenses. Use exactly: `Lens 1`, `Lens 2`, `Lens 3`. Each populated lens must materially change the framing. Unused slots: `not applicable`. No paraphrase-only variation.
 
 ### User Confirmation
 
-This is a mandatory pause between divergence and convergence.
-
-Purpose:
-
-- show the user what the three divergent stages produced
-- let the user redirect, select a lens, or confirm before convergence locks in
-
-Rules:
-
-- present a compact summary of `trend_signals`, `anti_consensus_angles`, and `perspective_lenses`
-- ask the user one focused question: which direction, angle, or lens should the research converge on
-- do not proceed to `Consolidated Brief` until the user responds
-- if the user says "continue" or gives no adjustment, treat the default recommended lens as confirmed
-- if the user redirects, update the framing before converging
+Mandatory pause. Present a compact summary of `trend_signals`, `anti_consensus_angles`, and `perspective_lenses`. Ask one focused question: which direction, angle, or lens to converge on. Do not proceed to `Consolidated Brief` until the user responds. If user says "continue" or gives no adjustment, treat the default recommended lens as confirmed. If user redirects, update framing before converging.
 
 ### Consolidated Brief
 
-This is the mandatory convergence point.
+Mandatory convergence point. Required fields: `research_question`, `research_goal`, `boundaries`, `out_of_scope`, `key_terms`, `framing_rationale`
 
-Required fields:
-
-- `research_question`
-- `research_goal`
-- `boundaries`
-- `out_of_scope`
-- `key_terms`
-- `framing_rationale`
-
-`boundaries` must use this typed shape:
+`boundaries` shape:
 
 ```json
 {
@@ -151,119 +58,40 @@ Required fields:
 }
 ```
 
-Rules:
-
-- exactly one recommended framing
-- alternatives may be included only as discarded alternatives
-- if multiple framings remain equally live, routing must not advance beyond confirmation
-- `out_of_scope` must match `boundaries.out_of_scope`
+Rules: exactly one recommended framing; alternatives only as discarded; if multiple framings remain equally live, do not advance past confirmation; `out_of_scope` must match `boundaries.out_of_scope`.
 
 ## Routing Layer
 
-Produce:
-
-- `routing_decision`
-- `route_payload`
-
 ### Routing Decision
 
-Required fields:
+Required fields: `target`, `reason`, `confidence`, `needs_user_confirmation`
 
-- `target`
-- `reason`
-- `confidence`
-- `needs_user_confirmation`
+Invariant: `needs_user_confirmation = true` iff `target = needs-confirmation`; false for all other targets.
 
-Invariant:
+### Targets
 
-- `needs_user_confirmation = true` if and only if `target = needs-confirmation`
-- for all other targets, `needs_user_confirmation = false`
+Priority order — use first match:
 
-### Allowed Targets
+1. `needs-confirmation` — unresolved ambiguity, missing key boundaries, or competing framings remain
+2. `deep-research` — brief is converged and task warrants multi-source synthesis or report-style analysis
+3. `skill-route` — brief is converged and a specific skill is a better match than deep-research
+4. `light-answer` — question is clear and does not justify deep-research or a specific skill
 
-- `needs-confirmation`
-- `deep-research`
-- `light-answer`
-- `skill-route`
-
-### Target Meanings
-
-#### `needs-confirmation`
-
-Use when:
-
-- the brief still has unresolved ambiguity
-- key boundaries are missing
-- multiple competing framings remain
-- the best next step requires user confirmation before execution
-
-This is the preserved form of the original Pinpoint clarification behavior.
-
-#### `deep-research`
-
-Use when:
-
-- the brief is converged
-- the task is substantial enough for multi-source synthesis, verification, or report-style analysis
-- the downstream payload can be filled safely
-
-#### `light-answer`
-
-Use when:
-
-- the question is already clear enough to answer
-- the task does not justify `deep-research`
-- no better downstream skill is a clearer match
-
-Semantics:
-
-- Pinpoint does not answer the question itself
-- `light-answer` is a dispatch contract for an outer agent or lighter downstream workflow
-- if no outer dispatch exists in the current environment, the outer agent may answer directly using the emitted payload
-
-#### `skill-route`
-
-Use when:
-
-- the question is already clear
-- a specific skill is a better next step than `deep-research` or `light-answer`
-
-## Routing Order
-
-Use this order exactly:
-
-1. if key ambiguity remains, route to `needs-confirmation`
-2. otherwise, if the task is substantial enough for `deep-research`, route to `deep-research`
-3. otherwise, if a specific skill is the best match, route to `skill-route`
-4. otherwise, route to `light-answer`
+`light-answer` is a dispatch contract for an outer agent; Pinpoint does not answer directly. If no outer dispatch exists, the outer agent may answer using the emitted payload.
 
 ## Deterministic Defaults
 
-### Time Normalization
+**Time normalization:** comparisons/evaluations without explicit range → `through YYYY-MM-DD` anchored to request date. Trend/landscape without explicit range → trailing 24-month range anchored to request date.
 
-- comparisons and evaluations without explicit time range normalize to an absolute `through YYYY-MM-DD` value anchored to the request date
-- trend or landscape requests without explicit time range normalize to an absolute trailing 24-month range anchored to the request date
+**Mode for `deep-research`:** `ultradeep` if explicitly requested; `deep` for high-stakes or rigorous requests; `quick` for exploratory-but-substantial; otherwise `standard`.
 
-### Mode Selection for `deep-research`
+**Context inference:** infer geography/context only when low-risk; otherwise `needs-confirmation`.
 
-- explicit user request for `ultradeep` wins
-- otherwise use `deep` for high-stakes or explicitly rigorous requests
-- otherwise use `quick` for exploratory but still substantial research requests
-- otherwise use `standard`
-
-### Context Inference
-
-- geography or context may be inferred only when low-risk
-- otherwise route to `needs-confirmation`
-
-### Related Multi-Part Requests
-
-- keep them together only if they support one deliverable and one shared research question
-- otherwise route to `needs-confirmation`
+**Multi-part requests:** keep together only if one deliverable and one shared research question; otherwise `needs-confirmation`.
 
 ## Route Payload Contract
 
-Conceptually, Pinpoint emits a uniform route shell:
+Route shell:
 
 ```json
 {
@@ -273,200 +101,56 @@ Conceptually, Pinpoint emits a uniform route shell:
 }
 ```
 
-Outer-agent rule:
-
-- read `target`
-- then parse only the payload relevant to that target
-
-External compatibility rule:
-
-- this route shell is Pinpoint's canonical internal contract
-- when `target = deep-research`, the user-facing output must remain the current legacy top-level `handoff_ready` JSON shape
-- no dual-format ambiguity is allowed at runtime
+Outer agent reads `target`, then parses only the relevant payload. When `target = deep-research`, user-facing output must be the legacy top-level `handoff_ready` JSON shape — no dual-format ambiguity.
 
 ### Payload: `deep-research`
 
-Preserve the current handoff contract inside `payload` as much as possible.
+Required fields: `handoff_version`, `terminal_state`, `target_skill`, `routing_reason`, `research_question`, `recommended_mode`, `research_goal`, `boundaries`, `assumptions`, `key_terms`, `success_criteria`, `next_action`
 
-Required fields:
+Constants (preserve exactly): `handoff_version: "1.1"`, `terminal_state: "handoff_ready"`, `target_skill: "deep-research"`, `next_action: "Invoke deep-research with this payload"`
 
-- `handoff_version`
-- `terminal_state`
-- `target_skill`
-- `routing_reason`
-- `research_question`
-- `recommended_mode`
-- `research_goal`
-- `boundaries`
-- `assumptions`
-- `key_terms`
-- `success_criteria`
-- `next_action`
-
-Compatibility rules:
-
-- preserve current field names
-- preserve these canonical constants exactly:
-  - `handoff_version: "1.1"`
-  - `terminal_state: "handoff_ready"`
-  - `target_skill: "deep-research"`
-  - `next_action: "Invoke deep-research with this payload"`
-- derive the payload from `consolidated_brief`, not raw upstream signals
-- emit the legacy top-level handoff JSON directly as the user-facing output for this route
+Derive from `consolidated_brief`, not raw upstream signals. Emit as legacy top-level JSON directly.
 
 ### Payload: `light-answer`
 
-Required fields:
-
-- `question`
-- `answer_goal`
-- `constraints`
-- `suggested_depth`
-- `key_terms`
+Required fields: `question`, `answer_goal`, `constraints`, `suggested_depth`, `key_terms`
 
 ### Payload: `needs-confirmation`
 
-Required fields:
-
-- `recommended_framing`
-- `alternative_framings`
-- `missing_boundaries`
-- `next_user_action`
-
-This payload preserves the original Pinpoint clarification role in structured form.
+Required fields: `recommended_framing`, `alternative_framings`, `missing_boundaries`, `next_user_action`
 
 ### Payload: `skill-route`
 
-Required fields:
+Required fields: `skill_id`, `routing_reason`, `skill_input`
 
-- `skill_id`
-- `routing_reason`
-- `skill_input`
-
-Registry rules:
-
-- `skill_id` must match the canonical installed skill name
-- `skill_input` must use this envelope:
+`skill_id` must match the canonical installed skill name. `skill_input` envelope:
 
 ```json
-{
-  "prompt": "string",
-  "context": {},
-  "constraints": []
-}
+{ "prompt": "string", "context": {}, "constraints": [] }
 ```
 
-- the outer agent must verify skill availability before dispatch
-- if the target skill is unavailable, fall back to `light-answer` when the request is still answerable without the skill; otherwise fall back to `needs-confirmation`
+Outer agent must verify skill availability before dispatch. If unavailable: fall back to `light-answer` if still answerable; otherwise `needs-confirmation`.
 
-## Output Policy
+## Output
 
-Pinpoint conceptually produces:
+Two passes. Do not execute downstream skills, gather evidence, or generate content drafts from inside Pinpoint.
 
-- `analysis_block`
-- `routing_decision`
-- `route_payload`
+**Pass 1 — divergence** (after Perspective Expansion): emit `divergence-confirmation`, stop, wait for user.
 
-Pinpoint runs in two passes:
+**Pass 2 — convergence** (after user responds): emit route payload, stop.
 
-- **Pass 1** (divergence): emit the confirmation prompt and stop
-- **Pass 2** (convergence): after user responds, emit the route payload
+### divergence-confirmation
 
-Exact serialization boundaries:
+Emit: Trend Signals (max 5), Anti-Consensus Angles (max 4), Perspective Lenses (all 3 slots), one focused convergence question. Stop — do not emit routing or consolidated brief.
 
-- `divergence-confirmation`: readable divergence summary + one focused confirmation question, then stop
-- `deep-research`: optional one-line lead-in, then legacy top-level JSON payload only
-- `needs-confirmation`: readable clarification brief first, then exactly one fenced `json` block containing the canonical route shell
-- `light-answer`: short routing summary first, then exactly one fenced `json` block containing the canonical route shell
-- `skill-route`: short routing summary first, then exactly one fenced `json` block containing the canonical route shell
+### needs-confirmation
 
-### Output Shape: `divergence-confirmation`
+Readable brief containing: Original Question, Trend Signals, Anti-Consensus Angles, Perspective Lenses, Consolidated Brief, Routing Decision, Recommended Framing, Alternative Framings, Next User Action. Then one fenced `json` block with the canonical route shell.
 
-Emit after completing Trend Scan, Anti-Consensus Scan, and Perspective Expansion.
+### deep-research
 
-Must include:
+Optional one-line lead-in, then legacy top-level handoff JSON only. Do not emit readable analysis sections.
 
-- `Trend Signals` (compact, max 5 items)
-- `Anti-Consensus Angles` (compact, max 4 items)
-- `Perspective Lenses` (all 3 slots)
-- one focused question asking the user which direction to converge on
-- explicit stop — do not emit any routing or consolidated brief
+### light-answer / skill-route
 
-### Output Shape: `needs-confirmation`
-
-The readable clarification brief must include:
-
-- `Original Question`
-- `Trend Signals`
-- `Anti-Consensus Angles`
-- `Perspective Lenses`
-- `Consolidated Brief`
-- `Routing Decision`
-- `Recommended Framing`
-- `Alternative Framings`
-- `Next User Action`
-
-### Output Shape: `deep-research`
-
-Do not emit readable analysis sections if that would break the legacy parser contract.
-
-Emit:
-
-- optional one-line lead-in
-- then the legacy top-level deep-research JSON only
-
-### Output Shape: `light-answer`
-
-Emit:
-
-- short routing summary
-- then one fenced `json` block containing the canonical route shell
-
-### Output Shape: `skill-route`
-
-Emit:
-
-- short routing summary
-- then one fenced `json` block containing the canonical route shell
-
-## Quality Bar
-
-The goal is not to sound smart. The goal is to improve the next decision.
-
-Prefer:
-
-- converged framing after useful perspective expansion
-- explicit boundaries
-- parse-stable routing
-- direct downstream utility
-
-Avoid:
-
-- answering too early
-- routing from raw insight lists
-- fuzzy target selection
-- output shapes that vary unpredictably
-
-## Stop Rule
-
-Pinpoint stops twice per request:
-
-**Pass 1 stop** — after Perspective Expansion:
-
-- emit `divergence-confirmation` output
-- stop and wait for user response
-
-**Pass 2 stop** — after routing:
-
-- `needs-confirmation`: stop after the readable brief and canonical route shell
-- `deep-research`: stop after the legacy top-level JSON payload
-- `light-answer`: stop after the routing summary and canonical route shell
-- `skill-route`: stop after the routing summary and canonical route shell
-
-Do not:
-
-- execute downstream skills from inside Pinpoint
-- gather evidence for deep research
-- generate full content drafts
-- continue past the selected route
-- skip Pass 1 stop under any circumstance
+Short routing summary, then one fenced `json` block with the canonical route shell.
