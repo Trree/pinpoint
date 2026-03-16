@@ -1,17 +1,17 @@
 ---
 name: pinpoint
-description: "Turn broad, vague, or mixed questions into clear research problems before deeper analysis. Use when the user wants to research, analyze, compare, evaluate, or think through a topic but the question still needs framing, narrowing, decomposition, or boundary-setting. Also use when the user explicitly asks to define the research question first, clarify what is really being asked, split one big question into sub-questions, or rewrite a topic into 2-3 research directions. Do not use for simple fact lookup or article drafting. Default behavior: if the question still needs framing, produce a compact research brief and stop; if it is already researchable, emit a structured handoff payload for an outer agent to invoke deep-research."
+description: "Expand broad, vague, or mixed questions into stronger research starting points before deeper analysis. Pinpoint first runs trend capture, anti-consensus exploration, and multi-perspective generation, then converges into one consolidated research brief. Default behavior: if the brief still needs framing, return the structured brief and stop; if it is already researchable and suitable for deep-research, emit the structured handoff payload for an outer agent to invoke deep-research."
 ---
 
 # Pinpoint
 
 Use this skill as a general research entrypoint.
 
-Your job in phase 1 is not to answer the original question. Your job is to decide whether it already is researchable.
+Your job is not to answer the original question. Your job is to expand useful perspectives, converge on one research brief, and then decide whether the request is ready for research handoff.
 
 This skill has exactly two terminal states:
 
-- `needs_framing`: the question is too broad, vague, or mixed and needs narrowing
+- `needs_framing`: the request still needs narrowing, clarification, or a lighter non-deep-research next step
 - `handoff_ready`: the question is already researchable and also appropriate for `deep-research`
 
 ## Trigger Rules
@@ -38,11 +38,97 @@ If the request is already researchable and appropriate for `deep-research`:
 - emit the structured `handoff_ready` payload
 - do not do evidence gathering yourself
 
+## Pipeline
+
+Run the request through this sequence:
+
+1. `Trend Scan`
+2. `Anti-Consensus Scan`
+3. `Perspective Expansion`
+4. `Consolidated Research Brief`
+5. `Researchability Check`
+
+The first three stages are inputs to the brief. They are not independent terminal outputs.
+
+### Trend Scan
+
+Purpose:
+
+- identify meaningful directional changes, emerging signals, timing windows, or shifting constraints
+
+Policy:
+
+- treat outputs as framing hypotheses, not asserted findings
+- keep them concise and decision-relevant
+- if no meaningful trend signals are identifiable, emit `none identified`
+
+Output constraints:
+
+- 3 to 5 trend signals maximum
+
+### Anti-Consensus Scan
+
+Purpose:
+
+- surface mainstream assumptions and identify angles that may be underexplored, weakly challenged, or misread
+
+Policy:
+
+- treat outputs as framing hypotheses or tensions, not final claims
+- if no credible anti-consensus angle is available, emit `none identified`
+
+Output constraints:
+
+- 2 to 4 anti-consensus angles maximum
+
+### Perspective Expansion
+
+Purpose:
+
+- generate multiple useful lenses before convergence
+
+Lens examples:
+
+- market
+- technology
+- user
+- policy
+- competition
+- distribution
+- organizational capability
+
+Policy:
+
+- use exactly 3 labeled lens slots: `Lens 1`, `Lens 2`, `Lens 3`
+- each populated lens must materially change how the research would be framed
+- if the topic cannot support all 3 meaningful lenses, fill unused slots with `not applicable`
+- avoid redundant rewordings
+
+### Consolidated Research Brief
+
+This is the mandatory convergence point.
+
+Hard rules:
+
+- always converge into one `Consolidated Research Brief`
+- never stop at a raw list of insights, trend signals, or perspective lenses
+- never hand off while multiple competing research questions remain unresolved
+
+The brief must contain:
+
+- chosen research question
+- research goal
+- key boundaries
+- explicit out-of-scope area
+- core terms
+- why this framing is preferable to the discarded alternatives
+
 ## Readiness Criteria
 
 Mark the question as `handoff_ready` only when all of the following are true:
 
-- the research object or subject is clear
+- the consolidated brief expresses one clear research subject
+- the consolidated brief expresses one clear research question
 - the time range is explicit or safely inferable
 - the geography or context is explicit or safely inferable
 - the task type is clear, such as compare, evaluate, trend, feasibility, landscape, chronology, or review
@@ -63,30 +149,33 @@ Operational defaults:
 
 Mode selection defaults:
 
-- `standard` is the default
-- `quick` is for exploratory but still researchable requests
-- `deep` is for high-stakes, decision-shaping, or explicitly rigorous requests
+- explicit user request for `ultradeep` wins over all other mode rules
+- otherwise use `deep` for high-stakes, decision-shaping, or explicitly rigorous requests
+- otherwise use `quick` for exploratory but still researchable requests
+- otherwise use `standard`
 - `ultradeep` is only for maximum-comprehensiveness requests explicitly signaled by the user
 
-## Phase 1 Workflow
+## Workflow
 
 Run these steps in order:
 
 1. Preserve the user's original question.
-2. Diagnose whether the question is `needs_framing` or `handoff_ready`.
-3. Infer the likely research goal behind the question when the intent is clear.
-4. If intent is ambiguous, present alternatives as assumptions rather than silently choosing one.
-5. Define the minimum necessary boundaries:
+2. Run `Trend Scan`.
+3. Run `Anti-Consensus Scan`.
+4. Run `Perspective Expansion`.
+5. Infer the likely research goal behind the question when the intent is clear.
+6. If intent is ambiguous, present alternatives as assumptions rather than silently choosing one.
+7. Build one `Consolidated Research Brief` with:
    - object or subject
    - time range
    - geography or context
    - evaluation criteria
    - what is out of scope
-6. If the question is too broad, rewrite it into 2-3 candidate research directions.
-7. Recommend the version that is most researchable.
-8. If the terminal state is `needs_framing`, produce a semi-structured research brief.
-9. If the terminal state is `handoff_ready`, emit the structured handoff payload for `deep-research`.
-10. Stop.
+8. If the brief is still ambiguous or too broad, rewrite it into 2 to 3 candidate research directions.
+9. Diagnose whether the brief is `needs_framing` or `handoff_ready`.
+10. If the terminal state is `needs_framing`, produce the structured brief and stop.
+11. If the terminal state is `handoff_ready`, emit the structured handoff payload for `deep-research`.
+12. Stop.
 
 ## Assumption Policy
 
@@ -104,10 +193,15 @@ Use one of these output shapes.
 Use a semi-structured format with this compact required backbone:
 
 - `Original Question`
+- `Trend Signals`
+- `Anti-Consensus Angles`
+- `Perspective Lenses`
+- `Consolidated Research Brief`
+- `Researchability Check`
 - `Terminal State`
 - `Why It Needs Narrowing`
-- `Recommended Research Version`
-- `Boundaries`
+- `Recommended Framing`
+- `Next User Action`
 - `Stop / Continue`
 
 Add these sections when they materially help:
@@ -118,7 +212,11 @@ Add these sections when they materially help:
 - `Candidate Research Versions`
 - `Research Brief`
 
+If the request is clear but too lightweight for `deep-research`, explain that directly inside `Researchability Check` and use `Next User Action` to recommend a lighter next step instead of asking for more narrowing.
+
 ### Output Shape: `handoff_ready`
+
+Use `Trend Scan`, `Anti-Consensus Scan`, `Perspective Expansion`, and `Consolidated Research Brief` as internal reasoning inputs, but do not emit them if doing so would break the outer-agent parsing contract.
 
 Emit a machine-readable JSON block and nothing else except an optional one-line lead-in.
 
@@ -143,7 +241,7 @@ Required schema:
   "assumptions": ["string"],
   "key_terms": ["string"],
   "success_criteria": ["string"],
-  "next_action": "Invoke deep-research with the payload above"
+  "next_action": "Invoke deep-research with this payload"
 }
 ```
 
@@ -159,6 +257,7 @@ When producing `handoff_ready`:
 - use `[]` for `evaluation_criteria` only on descriptive tasks such as trend, landscape, or chronology
 - do not use `null`; if a required value cannot be filled safely, do not emit `handoff_ready`
 - do not include source lists, evidence plans, or final conclusions
+- derive the payload from the `Consolidated Research Brief`, not directly from raw trend or lens outputs
 
 ## Research Brief
 
@@ -169,6 +268,7 @@ When you include a research brief, keep it short and practical. Summarize:
 - the boundaries
 - the key terms that matter for this round
 - what is explicitly out of scope
+- why this framing beats the discarded alternatives
 - a one-line next research action after user confirmation
 
 ## Quality Bar
@@ -178,6 +278,7 @@ The goal is not to sound smart. The goal is to make the question researchable.
 Prefer:
 
 - narrower scope
+- converged framing after useful perspective expansion
 - explicit boundaries
 - testable wording
 - direct research utility
@@ -185,6 +286,7 @@ Prefer:
 Avoid:
 
 - answering the full question too early
+- staying in a divergent insight list without converging
 - keeping the wording broad but impressive
 - over-defining irrelevant terms
 - silently replacing the user's intent
@@ -192,9 +294,9 @@ Avoid:
 
 ## Stop Rule
 
-After phase 1, stop in one of two ways:
+After the workflow, stop in one of two ways:
 
-- if `needs_framing`, stop and wait for user confirmation before going further
+- if `needs_framing`, stop with a structured brief and the exact next user action
 - if `handoff_ready`, stop after emitting the structured payload so an outer agent can invoke `deep-research`
 
 Do not automatically proceed into:
