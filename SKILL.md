@@ -49,13 +49,15 @@ Run the request through this sequence:
 1. `Trend Scan`
 2. `Anti-Consensus Scan`
 3. `Perspective Expansion`
-4. `Consolidated Brief`
-5. `Routing Decision`
+4. `User Confirmation` ← mandatory pause
+5. `Consolidated Brief`
+6. `Routing Decision`
 
 Hard rule:
 
 - the first three stages may widen perspective, but you must always converge into one `Consolidated Brief`
 - never select a route directly from raw signals or lens lists
+- never advance to `Consolidated Brief` without explicit user confirmation after stage 3
 
 ## Analysis Layer
 
@@ -67,6 +69,7 @@ Required sections:
 - `trend_signals`
 - `anti_consensus_angles`
 - `perspective_lenses`
+- `user_confirmation`
 - `consolidated_brief`
 
 ### Trend Scan
@@ -105,6 +108,23 @@ Rules:
 - each populated lens must materially change the framing
 - unused slots become `not applicable`
 - avoid paraphrase-only variation
+
+### User Confirmation
+
+This is a mandatory pause between divergence and convergence.
+
+Purpose:
+
+- show the user what the three divergent stages produced
+- let the user redirect, select a lens, or confirm before convergence locks in
+
+Rules:
+
+- present a compact summary of `trend_signals`, `anti_consensus_angles`, and `perspective_lenses`
+- ask the user one focused question: which direction, angle, or lens should the research converge on
+- do not proceed to `Consolidated Brief` until the user responds
+- if the user says "continue" or gives no adjustment, treat the default recommended lens as confirmed
+- if the user redirects, update the framing before converging
 
 ### Consolidated Brief
 
@@ -347,12 +367,30 @@ Pinpoint conceptually produces:
 - `routing_decision`
 - `route_payload`
 
+Pinpoint runs in two passes:
+
+- **Pass 1** (divergence): emit the confirmation prompt and stop
+- **Pass 2** (convergence): after user responds, emit the route payload
+
 Exact serialization boundaries:
 
+- `divergence-confirmation`: readable divergence summary + one focused confirmation question, then stop
 - `deep-research`: optional one-line lead-in, then legacy top-level JSON payload only
 - `needs-confirmation`: readable clarification brief first, then exactly one fenced `json` block containing the canonical route shell
 - `light-answer`: short routing summary first, then exactly one fenced `json` block containing the canonical route shell
 - `skill-route`: short routing summary first, then exactly one fenced `json` block containing the canonical route shell
+
+### Output Shape: `divergence-confirmation`
+
+Emit after completing Trend Scan, Anti-Consensus Scan, and Perspective Expansion.
+
+Must include:
+
+- `Trend Signals` (compact, max 5 items)
+- `Anti-Consensus Angles` (compact, max 4 items)
+- `Perspective Lenses` (all 3 slots)
+- one focused question asking the user which direction to converge on
+- explicit stop — do not emit any routing or consolidated brief
 
 ### Output Shape: `needs-confirmation`
 
@@ -411,7 +449,14 @@ Avoid:
 
 ## Stop Rule
 
-After routing, stop in one of these ways:
+Pinpoint stops twice per request:
+
+**Pass 1 stop** — after Perspective Expansion:
+
+- emit `divergence-confirmation` output
+- stop and wait for user response
+
+**Pass 2 stop** — after routing:
 
 - `needs-confirmation`: stop after the readable brief and canonical route shell
 - `deep-research`: stop after the legacy top-level JSON payload
@@ -424,3 +469,4 @@ Do not:
 - gather evidence for deep research
 - generate full content drafts
 - continue past the selected route
+- skip Pass 1 stop under any circumstance
