@@ -1,4 +1,4 @@
 interface:
   display_name: "Pinpoint"
   short_description: "Clarify vague topics before research"
-  default_prompt: "Use $pinpoint to turn this broad topic into 2-3 researchable directions and a brief, then stop for confirmation."
+  default_prompt: "Use $pinpoint to evaluate whether this topic needs framing or is already researchable and substantial enough for deep-research. If it needs framing, return 2-3 researchable directions and a brief. If it is handoff-ready, emit the structured handoff payload for deep-research."
