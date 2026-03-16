@@ -1,6 +1,6 @@
 ---
 name: pinpoint
-description: "Research entry router. Frames the request through a 3-stage divergence pipeline, pauses for user confirmation, converges to one brief, then routes to deep-research, light-answer, needs-confirmation, or skill-route."
+description: "Research entry router. Frames the request through a 5-dimension divergence analysis, pauses for user confirmation, converges to one brief, then routes to deep-research, light-answer, needs-confirmation, or skill-route."
 ---
 
 # Pinpoint
@@ -15,32 +15,42 @@ Do not invoke when: simple factual lookup, direct writing request with no routin
 
 ## Pipeline
 
-1. `Trend Scan`
-2. `Anti-Consensus Scan`
-3. `Perspective Expansion`
-4. `User Confirmation` ← mandatory stop
-5. `Consolidated Brief`
-6. `Routing Decision`
+1. `Causal Structure`
+2. `Stakeholder & Interest`
+3. `Assumption Challenge`
+4. `Temporal Context`
+5. `Constraint Reframe`
+6. `User Confirmation` ← mandatory stop
+7. `Consolidated Brief`
+8. `Routing Decision`
 
 ## Analysis Layer
 
-`analysis_block` fields: `original_question`, `trend_signals`, `anti_consensus_angles`, `perspective_lenses`, `user_confirmation`, `consolidated_brief`
+`analysis_block` fields: `original_question`, `causal_options`, `stakeholder_options`, `assumption_options`, `temporal_options`, `constraint_options`, `user_confirmation`, `consolidated_brief`
 
-### Trend Scan
+### Causal Structure
 
-Identify directional changes, emerging signals, timing windows, or shifting constraints. Outputs are framing hypotheses, not findings. Max 5 items. Use `none identified` if weak.
+Surface the level at which the question should be researched: symptom, mechanism, or root cause. Each option targets a different causal depth. Outputs are 3 mutually-exclusive Options (A/B/C), each a specific researchable question. Options within this dimension are mutually exclusive; options across dimensions can combine. No option may be a restatement of another option in this dimension.
 
-### Anti-Consensus Scan
+### Stakeholder & Interest
 
-Surface assumptions that may be weakly challenged or underexplored. Outputs are hypotheses or tensions, not conclusions. Max 4 items. Use `none identified` if weak.
+Surface whose perspective the question implicitly takes, and who else has a stake. Each option centers a different actor or interest group. Outputs are 3 mutually-exclusive Options (A/B/C), each a specific researchable question. Options within this dimension are mutually exclusive; options across dimensions can combine. No option may be a restatement of another option in this dimension.
 
-### Perspective Expansion
+### Assumption Challenge
 
-Generate 3 framing lenses. Use exactly: `Lens 1`, `Lens 2`, `Lens 3`. Each populated lens must materially change the framing. Unused slots: `not applicable`. No paraphrase-only variation.
+Surface one mainstream assumption per option that may be wrong or underexplored. Each option is a falsifiable hypothesis, not a conclusion. Outputs are 3 mutually-exclusive Options (A/B/C), each a specific researchable question. Options within this dimension are mutually exclusive; options across dimensions can combine. No option may be a restatement of another option in this dimension.
+
+### Temporal Context
+
+Surface the time structure of the question: is it a stable problem, a moving target, or a window-dependent opportunity? Each option frames a different temporal angle. Outputs are 3 mutually-exclusive Options (A/B/C), each a specific researchable question. Options within this dimension are mutually exclusive; options across dimensions can combine. No option may be a restatement of another option in this dimension.
+
+### Constraint Reframe
+
+Surface one assumed constraint per option that may be real, negotiable, or irrelevant. Each option reframes the possibility space differently. Outputs are 3 mutually-exclusive Options (A/B/C), each a specific researchable question. Options within this dimension are mutually exclusive; options across dimensions can combine. No option may be a restatement of another option in this dimension.
 
 ### User Confirmation
 
-Mandatory pause. Present a compact summary of `trend_signals`, `anti_consensus_angles`, and `perspective_lenses`. Ask one focused question: which direction, angle, or lens to converge on. Do not proceed to `Consolidated Brief` until the user responds. If user says "continue" or gives no adjustment, treat the default recommended lens as confirmed. If user redirects, update framing before converging.
+Mandatory pause. Present all 5 dimensions, each with its 3 options (A/B/C). Ask one focused question: which dimension and option to converge on, or which combination across dimensions. Do not proceed to `Consolidated Brief` until the user responds. If user says "continue" or gives no adjustment, treat the default recommended option as confirmed. If user redirects, update framing before converging.
 
 ### Consolidated Brief
 
@@ -135,17 +145,17 @@ Outer agent must verify skill availability before dispatch. If unavailable: fall
 
 Two passes. Do not execute downstream skills, gather evidence, or generate content drafts from inside Pinpoint.
 
-**Pass 1 — divergence** (after Perspective Expansion): emit `divergence-confirmation`, stop, wait for user.
+**Pass 1 — divergence** (after Constraint Reframe): emit `divergence-confirmation`, stop, wait for user.
 
 **Pass 2 — convergence** (after user responds): emit route payload, stop.
 
 ### divergence-confirmation
 
-Emit: Trend Signals (max 5), Anti-Consensus Angles (max 4), Perspective Lenses (all 3 slots), one focused convergence question. Stop — do not emit routing or consolidated brief.
+Emit: all 5 dimensions, each with Options A/B/C. One focused convergence question asking which option(s) to pursue. Stop — do not emit routing or consolidated brief.
 
 ### needs-confirmation
 
-Readable brief containing: Original Question, Trend Signals, Anti-Consensus Angles, Perspective Lenses, Consolidated Brief, Routing Decision, Recommended Framing, Alternative Framings, Next User Action. Then one fenced `json` block with the canonical route shell.
+Readable brief containing: Original Question, Causal Options, Stakeholder Options, Assumption Options, Temporal Options, Constraint Options, Consolidated Brief, Routing Decision, Recommended Framing, Alternative Framings, Next User Action. Then one fenced `json` block with the canonical route shell.
 
 ### deep-research
 
