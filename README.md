@@ -72,13 +72,16 @@ pinpoint/
 
 Pinpoint runs this sequence:
 
-1. `Trend Scan`
-2. `Anti-Consensus Scan`
-3. `Perspective Expansion`
-4. `Consolidated Brief`
-5. `Routing Decision`
+1. `Causal Structure`
+2. `Stakeholder & Interest`
+3. `Assumption Challenge`
+4. `Temporal Context`
+5. `Constraint Reframe`
+6. `User Confirmation` ← mandatory stop
+7. `Consolidated Brief`
+8. `Routing Decision`
 
-The first three stages are framing inputs. They must always converge into one `Consolidated Brief` before routing.
+The first five dimensions are framing inputs, each producing 3 mutually-exclusive options (A/B/C). They must always converge into one `Consolidated Brief` before routing.
 
 ## Route Targets
 
@@ -107,9 +110,12 @@ Use when the request is clear and a specific skill is a better next step than `d
 Pinpoint conceptually produces an `analysis_block` with:
 
 - `original_question`
-- `trend_signals`
-- `anti_consensus_angles`
-- `perspective_lenses`
+- `causal_options`
+- `stakeholder_options`
+- `assumption_options`
+- `temporal_options`
+- `constraint_options`
+- `user_confirmation`
 - `consolidated_brief`
 
 `consolidated_brief` is the authoritative basis for all routing. Pinpoint must not route directly from raw insight lists.
